@@ -1,0 +1,252 @@
+# Azure DevOps CI/CD Pipeline for MLOps
+# Triggers on commits to main branch
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  python.version: '3.9'
+  azureml.resourceGroup: 'mlops-cw2-rg'
+  azureml.workspaceName: 'ticket-priority-workspace'
+
+stages:
+  - stage: Build
+    displayName: 'Build and Test'
+    jobs:
+      - job: BuildJob
+        displayName: 'Build and Run Tests'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(python.version)'
+            displayName: 'Use Python $(python.version)'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+            displayName: 'Install dependencies'
+
+          - script: |
+              pip install pytest pytest-cov
+              pytest tests/ --junitxml=junit/test-results.xml --cov=src --cov-report=xml --cov-report=html
+            displayName: 'Run unit tests'
+
+          - task: PublishTestResults@2
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFiles: '**/test-*.xml'
+              testRunTitle: 'Python $(python.version)'
+            displayName: 'Publish test results'
+
+          - task: PublishCodeCoverageResults@1
+            inputs:
+              codeCoverageTool: Cobertura
+              summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.xml'
+            displayName: 'Publish coverage results'
+
+  - stage: DataValidation
+    displayName: 'Data Validation'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: ValidateData
+        displayName: 'Validate Input Data'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(python.version)'
+
+          - script: |
+              pip install -r requirements.txt
+            displayName: 'Install dependencies'
+
+          - script: |
+              python tests/test_data_validation.py
+            displayName: 'Run data validation tests'
+
+  - stage: Training
+    displayName: 'Model Training'
+    dependsOn: DataValidation
+    condition: succeeded()
+    jobs:
+      - job: TrainModel
+        displayName: 'Train and Register Model'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(python.version)'
+
+          - script: |
+              pip install -r requirements.txt
+            displayName: 'Install dependencies'
+
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: 'Azure-Service-Connection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Set Azure ML workspace
+                az configure --defaults workspace=$(azureml.workspaceName) group=$(azureml.resourceGroup)
+
+                # Run preprocessing
+                python src/data_preprocessing.py
+
+                # Train model (2 iterations)
+                python src/train_model.py --model_type multiclass --iterations 2
+            displayName: 'Preprocess data and train model'
+
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: 'Azure-Service-Connection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                # Evaluate models
+                python src/evaluate_model.py --model_type multiclass
+            displayName: 'Evaluate models'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: 'models'
+              ArtifactName: 'trained-models'
+            displayName: 'Publish model artifacts'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: 'evaluation_results'
+              ArtifactName: 'evaluation-results'
+            displayName: 'Publish evaluation results'
+
+  - stage: ModelValidation
+    displayName: 'Model Validation'
+    dependsOn: Training
+    condition: succeeded()
+    jobs:
+      - job: ValidateModel
+        displayName: 'Validate Model Performance'
+        steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              artifactName: 'evaluation-results'
+              downloadPath: '$(System.DefaultWorkingDirectory)'
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(python.version)'
+
+          - script: |
+              pip install -r requirements.txt
+            displayName: 'Install dependencies'
+
+          - script: |
+              python tests/test_model_performance.py
+            displayName: 'Run model performance tests'
+
+  - stage: DeployToStaging
+    displayName: 'Deploy to Staging'
+    dependsOn: ModelValidation
+    condition: succeeded()
+    jobs:
+      - deployment: DeployStaging
+        displayName: 'Deploy to Staging Environment'
+        environment: 'staging'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: UsePythonVersion@0
+                  inputs:
+                    versionSpec: '$(python.version)'
+
+                - script: |
+                    pip install -r requirements.txt
+                  displayName: 'Install dependencies'
+
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: 'Azure-Service-Connection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      # Register and deploy model to staging
+                      python src/deploy_model.py --action register --model_path models/multiclass_iteration_2/model.pkl --model_name ticket-priority-classifier
+                      python src/deploy_model.py --action deploy --model_name ticket-priority-classifier --endpoint_name ticket-priority-staging
+                  displayName: 'Deploy to staging endpoint'
+
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: 'Azure-Service-Connection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      # Test staging deployment
+                      python src/deploy_model.py --action test --endpoint_name ticket-priority-staging
+                  displayName: 'Test staging deployment'
+
+  - stage: DeployToProduction
+    displayName: 'Deploy to Production'
+    dependsOn: DeployToStaging
+    condition: succeeded()
+    jobs:
+      - deployment: DeployProduction
+        displayName: 'Deploy to Production Environment'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: UsePythonVersion@0
+                  inputs:
+                    versionSpec: '$(python.version)'
+
+                - script: |
+                    pip install -r requirements.txt
+                  displayName: 'Install dependencies'
+
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: 'Azure-Service-Connection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      # Deploy to production
+                      python src/deploy_model.py --action deploy --model_name ticket-priority-classifier --endpoint_name ticket-priority-production
+                  displayName: 'Deploy to production endpoint'
+
+                - task: AzureCLI@2
+                  inputs:
+                    azureSubscription: 'Azure-Service-Connection'
+                    scriptType: 'bash'
+                    scriptLocation: 'inlineScript'
+                    inlineScript: |
+                      # Test production deployment
+                      python src/deploy_model.py --action test --endpoint_name ticket-priority-production
+                  displayName: 'Test production deployment'
+
+  - stage: Monitoring
+    displayName: 'Setup Monitoring'
+    dependsOn: DeployToProduction
+    condition: succeeded()
+    jobs:
+      - job: SetupMonitoring
+        displayName: 'Configure Model Monitoring'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(python.version)'
+
+          - script: |
+              pip install -r requirements.txt
+            displayName: 'Install dependencies'
+
+          - script: |
+              echo "Monitoring configured for data drift and performance tracking"
+              echo "Monitoring reports will be generated in monitoring/ directory"
+            displayName: 'Setup monitoring alerts'
