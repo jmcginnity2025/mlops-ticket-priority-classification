@@ -82,6 +82,7 @@ jobs:
     name: Train and Evaluate Model
     runs-on: ubuntu-latest
     needs: data-validation
+    timeout-minutes: 45
 
     steps:
     - name: Checkout code
@@ -140,13 +141,22 @@ jobs:
 
         # Wait for completion (with timeout)
         print('⏳ Waiting for training to complete...')
-        run.wait_for_completion(show_output=True)
+        print('   Max wait time: 30 minutes')
 
-        if run.get_status() == 'Completed':
-            print('✅ Training completed successfully!')
-            exit(0)
-        else:
-            print(f'❌ Training failed with status: {run.get_status()}')
+        try:
+            run.wait_for_completion(show_output=True, wait_post_processing=True)
+
+            status = run.get_status()
+            if status == 'Completed':
+                print('✅ Training completed successfully!')
+                exit(0)
+            else:
+                print(f'❌ Training failed with status: {status}')
+                exit(1)
+        except Exception as e:
+            print(f'❌ Error during training: {str(e)}')
+            print(f'   Job status: {run.get_status()}')
+            print(f'   Portal URL: {run.get_portal_url()}')
             exit(1)
         "
 

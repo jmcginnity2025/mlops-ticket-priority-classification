@@ -15,7 +15,7 @@ import mlflow
 import mlflow.xgboost
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, confusion_matrix, classification_report
 from xgboost import XGBClassifier
@@ -112,7 +112,7 @@ print(f"✓ Preprocessing complete - Train: {X_train.shape}, Test: {X_test.shape
 
 # Step 6: Train Iteration 1
 print("\n6. Training Model - Iteration 1...")
-print("   (GridSearchCV with 5-fold CV - may take 5-10 minutes)")
+print("   (RandomizedSearchCV with 5-fold CV - optimized for speed)")
 
 with mlflow.start_run(run_name="multiclass_iteration_1"):
     mlflow.log_param("iteration", 1)
@@ -121,25 +121,28 @@ with mlflow.start_run(run_name="multiclass_iteration_1"):
     mlflow.log_param("train_samples", len(X_train))
     mlflow.log_param("test_samples", len(X_test))
 
-    param_grid = {
-        'max_depth': [4, 6, 8],
-        'n_estimators': [150, 250, 350],
-        'learning_rate': [0.05, 0.1, 0.15]
+    param_distributions = {
+        'max_depth': [4, 5, 6, 7, 8],
+        'n_estimators': [100, 150, 200, 250, 300, 350],
+        'learning_rate': [0.05, 0.08, 0.1, 0.12, 0.15],
+        'subsample': [0.8, 0.9, 1.0],
+        'colsample_bytree': [0.8, 0.9, 1.0]
     }
 
     base_model = XGBClassifier(random_state=42, eval_metric='mlogloss')
 
-    grid_search = GridSearchCV(
-        base_model, param_grid, cv=5, scoring='f1_weighted', verbose=1, n_jobs=-1
+    random_search = RandomizedSearchCV(
+        base_model, param_distributions, n_iter=20, cv=5,
+        scoring='f1_weighted', verbose=1, n_jobs=-1, random_state=42
     )
 
-    grid_search.fit(X_train, y_train)
-    model_iter1 = grid_search.best_estimator_
+    random_search.fit(X_train, y_train)
+    model_iter1 = random_search.best_estimator_
 
     # Log params
-    for param, value in grid_search.best_params_.items():
+    for param, value in random_search.best_params_.items():
         mlflow.log_param(f"best_{param}", value)
-    mlflow.log_metric("cv_best_score", grid_search.best_score_)
+    mlflow.log_metric("cv_best_score", random_search.best_score_)
 
     # Evaluate
     y_train_pred = model_iter1.predict(X_train)
@@ -159,12 +162,13 @@ with mlflow.start_run(run_name="multiclass_iteration_1"):
 
     mlflow.xgboost.log_model(model_iter1, "model")
 
-    print(f"\n   Best params: {grid_search.best_params_}")
+    print(f"\n   Best params: {random_search.best_params_}")
     print(f"   Test Accuracy: {metrics_iter1['test_accuracy']:.4f}")
     print(f"   Test F1: {metrics_iter1['test_f1']:.4f}")
 
 # Step 7: Train Iteration 2
 print("\n7. Training Model - Iteration 2...")
+print("   (RandomizedSearchCV with 5-fold CV - optimized for speed)")
 
 with mlflow.start_run(run_name="multiclass_iteration_2"):
     mlflow.log_param("iteration", 2)
@@ -173,25 +177,29 @@ with mlflow.start_run(run_name="multiclass_iteration_2"):
     mlflow.log_param("train_samples", len(X_train))
     mlflow.log_param("test_samples", len(X_test))
 
-    param_grid = {
-        'max_depth': [6, 8, 10],
-        'n_estimators': [200, 300, 400],
-        'learning_rate': [0.08, 0.12, 0.16]
+    param_distributions = {
+        'max_depth': [6, 7, 8, 9, 10],
+        'n_estimators': [200, 250, 300, 350, 400],
+        'learning_rate': [0.08, 0.1, 0.12, 0.14, 0.16],
+        'subsample': [0.8, 0.9, 1.0],
+        'colsample_bytree': [0.8, 0.9, 1.0],
+        'gamma': [0, 0.1, 0.2]
     }
 
     base_model = XGBClassifier(random_state=42, eval_metric='mlogloss')
 
-    grid_search = GridSearchCV(
-        base_model, param_grid, cv=5, scoring='f1_weighted', verbose=1, n_jobs=-1
+    random_search = RandomizedSearchCV(
+        base_model, param_distributions, n_iter=20, cv=5,
+        scoring='f1_weighted', verbose=1, n_jobs=-1, random_state=42
     )
 
-    grid_search.fit(X_train, y_train)
-    model_iter2 = grid_search.best_estimator_
+    random_search.fit(X_train, y_train)
+    model_iter2 = random_search.best_estimator_
 
     # Log params
-    for param, value in grid_search.best_params_.items():
+    for param, value in random_search.best_params_.items():
         mlflow.log_param(f"best_{param}", value)
-    mlflow.log_metric("cv_best_score", grid_search.best_score_)
+    mlflow.log_metric("cv_best_score", random_search.best_score_)
 
     # Evaluate
     y_train_pred = model_iter2.predict(X_train)
@@ -211,7 +219,7 @@ with mlflow.start_run(run_name="multiclass_iteration_2"):
 
     mlflow.xgboost.log_model(model_iter2, "model")
 
-    print(f"\n   Best params: {grid_search.best_params_}")
+    print(f"\n   Best params: {random_search.best_params_}")
     print(f"   Test Accuracy: {metrics_iter2['test_accuracy']:.4f}")
     print(f"   Test F1: {metrics_iter2['test_f1']:.4f}")
 
