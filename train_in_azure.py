@@ -122,9 +122,9 @@ with mlflow.start_run(run_name="multiclass_iteration_1"):
     mlflow.log_param("test_samples", len(X_test))
 
     param_grid = {
-        'max_depth': [3, 5],
-        'n_estimators': [100, 200],
-        'learning_rate': [0.01, 0.1]
+        'max_depth': [4, 6, 8],
+        'n_estimators': [150, 250, 350],
+        'learning_rate': [0.05, 0.1, 0.15]
     }
 
     base_model = XGBClassifier(random_state=42, eval_metric='mlogloss')
@@ -174,9 +174,9 @@ with mlflow.start_run(run_name="multiclass_iteration_2"):
     mlflow.log_param("test_samples", len(X_test))
 
     param_grid = {
-        'max_depth': [5, 7],
-        'n_estimators': [150, 250],
-        'learning_rate': [0.05, 0.15]
+        'max_depth': [6, 8, 10],
+        'n_estimators': [200, 300, 400],
+        'learning_rate': [0.08, 0.12, 0.16]
     }
 
     base_model = XGBClassifier(random_state=42, eval_metric='mlogloss')
