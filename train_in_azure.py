@@ -37,7 +37,7 @@ except:
 # Step 3: Setup MLflow
 print("\n3. Setting up MLflow...")
 mlflow.set_tracking_uri(ws.get_mlflow_tracking_uri())
-mlflow.set_experiment("ticket-priority-classification")
+# Don't set experiment - use the one from Azure ML run context
 print("✓ MLflow configured")
 
 # Step 4: Load dataset
@@ -114,114 +114,107 @@ print(f"✓ Preprocessing complete - Train: {X_train.shape}, Test: {X_test.shape
 print("\n6. Training Model - Iteration 1...")
 print("   (RandomizedSearchCV with 5-fold CV - optimized for speed)")
 
-with mlflow.start_run(run_name="multiclass_iteration_1"):
-    mlflow.log_param("iteration", 1)
-    mlflow.log_param("model_type", "multiclass_classification")
-    mlflow.log_param("algorithm", "xgboost")
-    mlflow.log_param("train_samples", len(X_train))
-    mlflow.log_param("test_samples", len(X_test))
+# Log parameters for iteration 1
+mlflow.log_param("iteration", 1)
+mlflow.log_param("model_type", "multiclass_classification")
+mlflow.log_param("algorithm", "xgboost")
+mlflow.log_param("train_samples", len(X_train))
+mlflow.log_param("test_samples", len(X_test))
 
-    param_distributions = {
-        'max_depth': [4, 5, 6, 7, 8],
-        'n_estimators': [100, 150, 200, 250, 300, 350],
-        'learning_rate': [0.05, 0.08, 0.1, 0.12, 0.15],
-        'subsample': [0.8, 0.9, 1.0],
-        'colsample_bytree': [0.8, 0.9, 1.0]
-    }
+param_distributions = {
+    'max_depth': [4, 5, 6, 7, 8],
+    'n_estimators': [100, 150, 200, 250, 300, 350],
+    'learning_rate': [0.05, 0.08, 0.1, 0.12, 0.15],
+    'subsample': [0.8, 0.9, 1.0],
+    'colsample_bytree': [0.8, 0.9, 1.0]
+}
 
-    base_model = XGBClassifier(random_state=42, eval_metric='mlogloss')
+base_model = XGBClassifier(random_state=42, eval_metric='mlogloss')
 
-    random_search = RandomizedSearchCV(
-        base_model, param_distributions, n_iter=20, cv=5,
-        scoring='f1_weighted', verbose=1, n_jobs=-1, random_state=42
-    )
+random_search = RandomizedSearchCV(
+    base_model, param_distributions, n_iter=20, cv=5,
+    scoring='f1_weighted', verbose=1, n_jobs=-1, random_state=42
+)
 
-    random_search.fit(X_train, y_train)
-    model_iter1 = random_search.best_estimator_
+random_search.fit(X_train, y_train)
+model_iter1 = random_search.best_estimator_
 
-    # Log params
-    for param, value in random_search.best_params_.items():
-        mlflow.log_param(f"best_{param}", value)
-    mlflow.log_metric("cv_best_score", random_search.best_score_)
+# Log params
+for param, value in random_search.best_params_.items():
+    mlflow.log_param(f"iter1_{param}", value)
+mlflow.log_metric("iter1_cv_best_score", random_search.best_score_)
 
-    # Evaluate
-    y_train_pred = model_iter1.predict(X_train)
-    y_test_pred = model_iter1.predict(X_test)
+# Evaluate
+y_train_pred = model_iter1.predict(X_train)
+y_test_pred = model_iter1.predict(X_test)
 
-    metrics_iter1 = {
-        'train_accuracy': accuracy_score(y_train, y_train_pred),
-        'test_accuracy': accuracy_score(y_test, y_test_pred),
-        'train_f1': f1_score(y_train, y_train_pred, average='weighted'),
-        'test_f1': f1_score(y_test, y_test_pred, average='weighted'),
-        'test_precision': precision_score(y_test, y_test_pred, average='weighted'),
-        'test_recall': recall_score(y_test, y_test_pred, average='weighted')
-    }
+metrics_iter1 = {
+    'train_accuracy': accuracy_score(y_train, y_train_pred),
+    'test_accuracy': accuracy_score(y_test, y_test_pred),
+    'train_f1': f1_score(y_train, y_train_pred, average='weighted'),
+    'test_f1': f1_score(y_test, y_test_pred, average='weighted'),
+    'test_precision': precision_score(y_test, y_test_pred, average='weighted'),
+    'test_recall': recall_score(y_test, y_test_pred, average='weighted')
+}
 
-    for metric_name, metric_value in metrics_iter1.items():
-        mlflow.log_metric(metric_name, metric_value)
+for metric_name, metric_value in metrics_iter1.items():
+    mlflow.log_metric(f"iter1_{metric_name}", metric_value)
 
-    mlflow.xgboost.log_model(model_iter1, "model")
+mlflow.xgboost.log_model(model_iter1, "model_iter1")
 
-    print(f"\n   Best params: {random_search.best_params_}")
-    print(f"   Test Accuracy: {metrics_iter1['test_accuracy']:.4f}")
-    print(f"   Test F1: {metrics_iter1['test_f1']:.4f}")
+print(f"\n   Best params: {random_search.best_params_}")
+print(f"   Test Accuracy: {metrics_iter1['test_accuracy']:.4f}")
+print(f"   Test F1: {metrics_iter1['test_f1']:.4f}")
 
 # Step 7: Train Iteration 2
 print("\n7. Training Model - Iteration 2...")
 print("   (RandomizedSearchCV with 5-fold CV - optimized for speed)")
 
-with mlflow.start_run(run_name="multiclass_iteration_2"):
-    mlflow.log_param("iteration", 2)
-    mlflow.log_param("model_type", "multiclass_classification")
-    mlflow.log_param("algorithm", "xgboost")
-    mlflow.log_param("train_samples", len(X_train))
-    mlflow.log_param("test_samples", len(X_test))
+param_distributions = {
+    'max_depth': [6, 7, 8, 9, 10],
+    'n_estimators': [200, 250, 300, 350, 400],
+    'learning_rate': [0.08, 0.1, 0.12, 0.14, 0.16],
+    'subsample': [0.8, 0.9, 1.0],
+    'colsample_bytree': [0.8, 0.9, 1.0],
+    'gamma': [0, 0.1, 0.2]
+}
 
-    param_distributions = {
-        'max_depth': [6, 7, 8, 9, 10],
-        'n_estimators': [200, 250, 300, 350, 400],
-        'learning_rate': [0.08, 0.1, 0.12, 0.14, 0.16],
-        'subsample': [0.8, 0.9, 1.0],
-        'colsample_bytree': [0.8, 0.9, 1.0],
-        'gamma': [0, 0.1, 0.2]
-    }
+base_model = XGBClassifier(random_state=42, eval_metric='mlogloss')
 
-    base_model = XGBClassifier(random_state=42, eval_metric='mlogloss')
+random_search = RandomizedSearchCV(
+    base_model, param_distributions, n_iter=20, cv=5,
+    scoring='f1_weighted', verbose=1, n_jobs=-1, random_state=42
+)
 
-    random_search = RandomizedSearchCV(
-        base_model, param_distributions, n_iter=20, cv=5,
-        scoring='f1_weighted', verbose=1, n_jobs=-1, random_state=42
-    )
+random_search.fit(X_train, y_train)
+model_iter2 = random_search.best_estimator_
 
-    random_search.fit(X_train, y_train)
-    model_iter2 = random_search.best_estimator_
+# Log params
+for param, value in random_search.best_params_.items():
+    mlflow.log_param(f"iter2_{param}", value)
+mlflow.log_metric("iter2_cv_best_score", random_search.best_score_)
 
-    # Log params
-    for param, value in random_search.best_params_.items():
-        mlflow.log_param(f"best_{param}", value)
-    mlflow.log_metric("cv_best_score", random_search.best_score_)
+# Evaluate
+y_train_pred = model_iter2.predict(X_train)
+y_test_pred = model_iter2.predict(X_test)
 
-    # Evaluate
-    y_train_pred = model_iter2.predict(X_train)
-    y_test_pred = model_iter2.predict(X_test)
+metrics_iter2 = {
+    'train_accuracy': accuracy_score(y_train, y_train_pred),
+    'test_accuracy': accuracy_score(y_test, y_test_pred),
+    'train_f1': f1_score(y_train, y_train_pred, average='weighted'),
+    'test_f1': f1_score(y_test, y_test_pred, average='weighted'),
+    'test_precision': precision_score(y_test, y_test_pred, average='weighted'),
+    'test_recall': recall_score(y_test, y_test_pred, average='weighted')
+}
 
-    metrics_iter2 = {
-        'train_accuracy': accuracy_score(y_train, y_train_pred),
-        'test_accuracy': accuracy_score(y_test, y_test_pred),
-        'train_f1': f1_score(y_train, y_train_pred, average='weighted'),
-        'test_f1': f1_score(y_test, y_test_pred, average='weighted'),
-        'test_precision': precision_score(y_test, y_test_pred, average='weighted'),
-        'test_recall': recall_score(y_test, y_test_pred, average='weighted')
-    }
+for metric_name, metric_value in metrics_iter2.items():
+    mlflow.log_metric(f"iter2_{metric_name}", metric_value)
 
-    for metric_name, metric_value in metrics_iter2.items():
-        mlflow.log_metric(metric_name, metric_value)
+mlflow.xgboost.log_model(model_iter2, "model_iter2")
 
-    mlflow.xgboost.log_model(model_iter2, "model")
-
-    print(f"\n   Best params: {random_search.best_params_}")
-    print(f"   Test Accuracy: {metrics_iter2['test_accuracy']:.4f}")
-    print(f"   Test F1: {metrics_iter2['test_f1']:.4f}")
+print(f"\n   Best params: {random_search.best_params_}")
+print(f"   Test Accuracy: {metrics_iter2['test_accuracy']:.4f}")
+print(f"   Test F1: {metrics_iter2['test_f1']:.4f}")
 
 # Step 8: Compare & Test
 print("\n8. Model Comparison & Regression Tests...")
