@@ -1,0 +1,99 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Data files
+*.csv
+*.parquet
+*.json
+!config/*.yaml
+!config/*.json
+
+# Except specific files
+!evaluation_results/**/*.json
+!monitoring/**/*.json
+
+# Models
+models/
+*.pkl
+*.h5
+*.pb
+*.onnx
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Azure
+.azure/
+azureml-logs/
+
+# Secrets
+.env
+*.env
+secrets/
+credentials.json
+deployment_info.json
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Test results
+junit/
+.pytest_cache/
+.tox/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+nul
