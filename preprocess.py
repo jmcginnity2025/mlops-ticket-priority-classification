@@ -12,7 +12,7 @@ import json
 from datetime import datetime
 
 # Dataset path
-DATA_PATH = "C:\\AI Masters\\AI Masters\\Infrastucture Module - Azure\\CW2 New\\cleaned_support_tickets - with context.csv"
+DATA_PATH = "data/cleaned_support_tickets - with context.csv"
 OUTPUT_DIR = "processed_data"
 
 def load_data():
