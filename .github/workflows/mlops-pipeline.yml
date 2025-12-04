@@ -120,8 +120,15 @@ jobs:
         compute_target = ComputeTarget(workspace=ws, name='CPU-Cluster')
         print(f'✅ Using compute: {compute_target.name}')
 
-        # Create environment
+        # Create environment from requirements.txt
         env = Environment.from_pip_requirements(name='mlops-env', file_path='requirements.txt')
+        env.python.conda_dependencies.set_python_version('3.9')
+
+        # Register the environment (builds Docker image with all dependencies)
+        print('🔧 Registering environment (this may take a few minutes)...')
+        env.register(workspace=ws)
+        env = env.build(workspace=ws)
+        print('✅ Environment ready')
 
         # Configure the training run
         config = ScriptRunConfig(
