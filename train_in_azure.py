@@ -98,6 +98,10 @@ feature_cols = [col for col in numeric_features + categorical_features + binary_
 X = df_clean[feature_cols]
 y = df_clean[target_col]
 
+# Remap target to 0-indexed (XGBoost requirement)
+# priority_cat has values 1, 2, 3 but XGBoost expects 0, 1, 2
+y = y - 1
+
 # Split data
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42, stratify=y
