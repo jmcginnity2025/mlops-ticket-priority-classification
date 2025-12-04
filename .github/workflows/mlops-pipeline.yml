@@ -124,11 +124,10 @@ jobs:
         env = Environment.from_pip_requirements(name='mlops-env', file_path='requirements.txt')
         env.python.conda_dependencies.set_python_version('3.9')
 
-        # Register the environment (builds Docker image with all dependencies)
-        print('🔧 Registering environment (this may take a few minutes)...')
+        # Register environment (image will build automatically when job runs)
+        print('🔧 Registering environment...')
         env.register(workspace=ws)
-        env = env.build(workspace=ws)
-        print('✅ Environment ready')
+        print('✅ Environment registered - image will build when training job starts')
 
         # Configure the training run
         config = ScriptRunConfig(
