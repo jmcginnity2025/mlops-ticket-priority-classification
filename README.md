@@ -405,3 +405,4 @@ For questions or issues, please contact [your email/contact info].
 ---
 
 **Academic Note**: This project demonstrates MLOps best practices for the Infrastructure Module Coursework CW2. All implementations follow industry standards and are designed for educational purposes.
+# Testing CI/CD pipeline with new compute
