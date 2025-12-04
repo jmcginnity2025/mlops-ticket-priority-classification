@@ -14,6 +14,7 @@ azureml-dataset-runtime>=1.45.0
 
 # MLflow for Experiment Tracking
 mlflow>=2.0.0
+azureml-mlflow>=1.45.0
 
 # Data Validation and Monitoring
 great-expectations>=0.15.0
