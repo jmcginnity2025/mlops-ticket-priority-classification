@@ -13,7 +13,7 @@ env:
   PYTHON_VERSION: '3.9'
   RESOURCE_GROUP: 'cw2-mlops-rg'
   WORKSPACE_NAME: 'cw2-mlops-workspace'
-  COMPUTE_NAME: 'cpu-cluster-uksouth'
+  COMPUTE_NAME: 'cpu-cluster-fast'
 
 jobs:
   # Job 1: Data Preprocessing (Local - Fast)
