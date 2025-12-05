@@ -14,7 +14,7 @@ import os
 import pickle
 import json
 
-# Try to import Azure ML's native logging (works reliably, unlike MLflow)
+# Import both Azure ML native logging and MLflow (minimal usage)
 try:
     from azureml.core import Run
     run = Run.get_context()
@@ -23,6 +23,15 @@ try:
 except:
     AZURE_ML_LOGGING = False
     print("INFO: Running locally - Azure ML logging not available")
+
+# Try to import MLflow for simple metric logging only (not model logging)
+try:
+    import mlflow
+    MLFLOW_AVAILABLE = True
+    print("INFO: MLflow available for metric logging")
+except:
+    MLFLOW_AVAILABLE = False
+    print("INFO: MLflow not available")
 
 # Parse arguments
 parser = argparse.ArgumentParser()
@@ -157,6 +166,17 @@ if AZURE_ML_LOGGING:
     run.log("iteration_1_test_recall", float(test_recall))
     print("   Metrics logged to Azure ML Studio")
 
+# Also log to MLflow (simple metrics only, no model artifacts)
+if MLFLOW_AVAILABLE:
+    mlflow.log_metric("iteration_1_train_accuracy", float(train_acc))
+    mlflow.log_metric("iteration_1_test_accuracy", float(test_acc))
+    mlflow.log_metric("iteration_1_train_f1", float(train_f1))
+    mlflow.log_metric("iteration_1_test_f1", float(test_f1))
+    mlflow.log_param("iteration_1_model_type", "RandomForest")
+    mlflow.log_param("iteration_1_n_estimators", 100)
+    mlflow.log_param("iteration_1_max_depth", 10)
+    print("   Metrics logged to MLflow")
+
 # Save iteration 1 model
 with open("outputs/iteration_1_model.pkl", "wb") as f:
     pickle.dump(model1, f)
@@ -228,6 +248,22 @@ if AZURE_ML_LOGGING:
     improvement = (metrics_2['test_accuracy'] - metrics_1['test_accuracy']) * 100
     run.log("accuracy_improvement_percent", float(improvement))
     print("   Metrics logged to Azure ML Studio")
+
+# Also log to MLflow (simple metrics only, no model artifacts)
+if MLFLOW_AVAILABLE:
+    mlflow.log_metric("iteration_2_train_accuracy", float(train_acc))
+    mlflow.log_metric("iteration_2_test_accuracy", float(test_acc))
+    mlflow.log_metric("iteration_2_train_f1", float(train_f1))
+    mlflow.log_metric("iteration_2_test_f1", float(test_f1))
+    mlflow.log_param("iteration_2_model_type", "XGBoost")
+    mlflow.log_param("iteration_2_n_estimators", 200)
+    mlflow.log_param("iteration_2_max_depth", 6)
+    mlflow.log_param("iteration_2_learning_rate", 0.1)
+
+    # Log comparison
+    improvement = (metrics_2['test_accuracy'] - metrics_1['test_accuracy']) * 100
+    mlflow.log_metric("accuracy_improvement_percent", float(improvement))
+    print("   Metrics logged to MLflow")
 
 # Save iteration 2 model
 with open("outputs/iteration_2_model.pkl", "wb") as f:
