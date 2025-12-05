@@ -156,7 +156,7 @@ jobs:
         print("\n✅ Azure ML training completed successfully!")
         EOF
 
-    - name: Download Metrics from Azure ML
+    - name: Download Models and Metrics from Azure ML
       run: |
         python << 'EOF'
         from azure.ai.ml import MLClient
@@ -165,7 +165,7 @@ jobs:
         import os
 
         print("\n" + "="*70)
-        print("DOWNLOADING METRICS FROM AZURE ML")
+        print("DOWNLOADING MODELS AND METRICS FROM AZURE ML")
         print("="*70)
 
         # Connect to workspace
@@ -180,52 +180,47 @@ jobs:
         with open("job_name.txt", "r") as f:
             job_name = f.read().strip()
 
-        print(f"\nDownloading metrics from job: {job_name}")
+        print(f"\nDownloading outputs from job: {job_name}")
 
         # Get the job
         job = ml_client.jobs.get(job_name)
-
-        # Download outputs (models and metrics would be here)
         print(f"✅ Job status: {job.status}")
-        print("\nNote: Metrics are logged to MLflow in Azure ML Studio")
-        print(f"View at: https://ml.azure.com/runs/{job_name}")
 
-        # For regression testing, we'll use the MLflow metrics
-        # In a production setup, you'd fetch these via MLflow API
-        # For now, we'll create mock metrics based on expected performance
+        # Download job outputs (this includes the models and metrics)
+        print("\n📥 Downloading job outputs...")
+        ml_client.jobs.download(name=job_name, download_path=".", output_name="outputs")
+        print("✅ Outputs downloaded")
+
+        # The outputs are downloaded to ./artifacts/{job_name}/outputs/
+        # We need to reorganize them into our expected structure
+        import shutil
+
+        artifacts_path = f"./artifacts/{job_name}/outputs"
 
         # Create models directory structure
         os.makedirs("models/iteration_1", exist_ok=True)
         os.makedirs("models/iteration_2", exist_ok=True)
 
-        # These would be fetched from MLflow in production
-        # For now, using expected values from Azure ML training
-        iter1_metrics = {
-            "iteration": 1,
-            "model_type": "RandomForest",
-            "test_accuracy": 0.8684,
-            "test_f1": 0.8660,
-            "test_precision": 0.8702,
-            "test_recall": 0.8684
-        }
+        # Copy model files
+        if os.path.exists(f"{artifacts_path}/iteration_1_model.pkl"):
+            shutil.copy(f"{artifacts_path}/iteration_1_model.pkl", "models/iteration_1/iteration_1_model.pkl")
+            print("✅ Copied iteration_1_model.pkl")
 
-        iter2_metrics = {
-            "iteration": 2,
-            "model_type": "XGBoost",
-            "test_accuracy": 0.9097,
-            "test_f1": 0.9088,
-            "test_precision": 0.9102,
-            "test_recall": 0.9097
-        }
+        if os.path.exists(f"{artifacts_path}/iteration_2_model.pkl"):
+            shutil.copy(f"{artifacts_path}/iteration_2_model.pkl", "models/iteration_2/iteration_2_model.pkl")
+            print("✅ Copied iteration_2_model.pkl")
 
-        # Save metrics locally for regression testing
-        with open("models/iteration_1/metrics.json", "w") as f:
-            json.dump(iter1_metrics, f, indent=2)
+        # Copy metrics files if they exist
+        if os.path.exists(f"{artifacts_path}/iteration_1_metrics.json"):
+            shutil.copy(f"{artifacts_path}/iteration_1_metrics.json", "models/iteration_1/metrics.json")
+            print("✅ Copied iteration_1 metrics")
 
-        with open("models/iteration_2/metrics.json", "w") as f:
-            json.dump(iter2_metrics, f, indent=2)
+        if os.path.exists(f"{artifacts_path}/iteration_2_metrics.json"):
+            shutil.copy(f"{artifacts_path}/iteration_2_metrics.json", "models/iteration_2/metrics.json")
+            print("✅ Copied iteration_2 metrics")
 
-        print("\n✅ Metrics downloaded and ready for regression testing")
+        print("\n✅ Models and metrics downloaded and organized")
+        print(f"   View job at: https://ml.azure.com/runs/{job_name}")
         EOF
 
     - name: Save Model Information
