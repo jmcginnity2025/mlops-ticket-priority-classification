@@ -71,17 +71,17 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Submit Training Job to Azure ML
-      id: submit_job
+    - name: Step 1 - Build Environment Image in Azure ML
+      id: build_env
       run: |
         python << 'EOF'
-        from azure.ai.ml import MLClient, command, Input, Output
-        from azure.ai.ml.entities import Environment
+        from azure.ai.ml import MLClient
+        from azure.ai.ml.entities import Environment, BuildContext
         from azure.identity import DefaultAzureCredential
-        import os
+        import time
 
         print("="*70)
-        print("SUBMITTING TRAINING JOB TO AZURE ML")
+        print("STEP 1: BUILDING ENVIRONMENT IMAGE IN AZURE ML")
         print("="*70)
 
         # Connect to workspace
@@ -94,20 +94,70 @@ jobs:
 
         print(f"\n✅ Connected to workspace: ${{ env.WORKSPACE_NAME }}")
 
-        # Get dataset
-        data_asset = ml_client.data.get(name="support-tickets-dataset", version="1")
-        print(f"✅ Dataset found: {data_asset.name}")
+        # Create environment with unique version to force rebuild
+        import datetime
+        version = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 
-        # Create environment
         env = Environment(
             name="mlops-training-env",
+            version=version,
             conda_file="environment.yml",
             image="mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04:latest"
         )
 
+        # Create/register the environment - this triggers the prepare_image job
+        print(f"\n🔨 Creating environment version {version}...")
+        print("   This will trigger Azure ML to build a Docker image")
+        created_env = ml_client.environments.create_or_update(env)
+        print(f"✅ Environment registered: {created_env.name}:{created_env.version}")
+        print(f"   Azure ML will now build the image (prepare_image job)")
+
+        # Save environment info
+        with open("env_info.txt", "w") as f:
+            f.write(f"{created_env.name}:{created_env.version}")
+
+        # Wait a bit for the image build to start
+        print("\n⏳ Waiting for image build to initialize...")
+        time.sleep(30)
+        print("✅ Environment build job submitted")
+        EOF
+
+    - name: Step 2 - Submit Training Job to Azure ML
+      id: submit_training
+      run: |
+        python << 'EOF'
+        from azure.ai.ml import MLClient, command, Input, Output
+        from azure.ai.ml.entities import Environment
+        from azure.identity import DefaultAzureCredential
+        import os
+
+        print("\n" + "="*70)
+        print("STEP 2: SUBMITTING TRAINING JOB TO AZURE ML")
+        print("="*70)
+
+        # Connect to workspace
+        ml_client = MLClient(
+            DefaultAzureCredential(),
+            subscription_id="${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+            resource_group_name="${{ env.RESOURCE_GROUP }}",
+            workspace_name="${{ env.WORKSPACE_NAME }}"
+        )
+
+        # Read environment info
+        with open("env_info.txt", "r") as f:
+            env_name_version = f.read().strip()
+
+        env_name, env_version = env_name_version.split(":")
+        print(f"✅ Using environment: {env_name}:{env_version}")
+
+        # Get dataset
+        data_asset = ml_client.data.get(name="support-tickets-dataset", version="1")
+        print(f"✅ Dataset found: {data_asset.name}")
+
+        # Reference the environment we just created
+        env_ref = f"azureml:{env_name}:{env_version}"
+
         # Create training job
-        # Azure ML will download the dataset and pass its path to the script
-        # IMPORTANT: Quote the path to handle spaces in filename
         train_command = 'python train_azure.py --data_path "{inputs.dataset_input}"'
 
         job = command(
@@ -122,15 +172,15 @@ jobs:
             outputs={
                 "outputs": Output(type="uri_folder")
             },
-            environment=env,
+            environment=env_ref,
             compute="${{ env.COMPUTE_NAME }}",
             experiment_name="unified-cicd-training",
-            display_name="unified-run-${{ github.run_number }}"
+            display_name="training-run-${{ github.run_number }}"
         )
 
         # Submit job
         returned_job = ml_client.jobs.create_or_update(job)
-        print(f"\n✅ Job submitted successfully!")
+        print(f"\n✅ Training job submitted successfully!")
         print(f"   Job Name: {returned_job.name}")
         print(f"   Status: {returned_job.status}")
         print(f"   Studio URL: https://ml.azure.com/runs/{returned_job.name}")
@@ -141,7 +191,7 @@ jobs:
 
         # Wait for completion
         print("\n⏳ Waiting for training to complete...")
-        print("   (This may take 15-20 minutes on first run)")
+        print("   (This will take 15-20 minutes)")
         ml_client.jobs.stream(returned_job.name)
 
         # Get final status
@@ -154,6 +204,9 @@ jobs:
             exit(1)
 
         print("\n✅ Azure ML training completed successfully!")
+        print("\nℹ️  Check Azure ML Studio - you should see 2 jobs:")
+        print("   1. prepare_image (environment build)")
+        print("   2. training-run-${{ github.run_number }} (model training)")
         EOF
 
     - name: Download Models and Metrics from Azure ML
