@@ -114,10 +114,10 @@ jobs:
         print("   This will trigger Azure ML to create prepare_image job")
 
         # Submit training job (trains both Random Forest and XGBoost)
-        # Note: Azure ML v2 uses {inputs.dataset} syntax (single braces)
+        # Using simple script with no arguments - dataset auto-discovered
         job = command(
             code="./",
-            command="python train_azure.py --data_path {inputs.dataset}",
+            command="python train_simple.py",
             inputs={"dataset": Input(type="uri_file", path=data_asset.id)},
             outputs={"outputs": Output(type="uri_folder")},
             environment=env,
