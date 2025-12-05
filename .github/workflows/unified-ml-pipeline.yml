@@ -249,14 +249,12 @@ jobs:
         with open("job_name.txt", "r") as f:
             job_name = f.read().strip()
 
-        # Download model outputs from the job
-        print(f"\n📦 Downloading model artifacts from job: {job_name}")
-        ml_client.jobs.download(name=job_name, download_path="./job_outputs", output_name="outputs")
+        print(f"\n📦 Using models from Azure ML job: {job_name}")
 
-        # Register Iteration 1 Model (Baseline)
+        # Register Iteration 1 Model (Baseline) - using Azure ML job outputs
         print("\n📝 Registering Iteration 1: Random Forest Baseline")
         model1 = Model(
-            path="./job_outputs/outputs/iteration_1_model.pkl",
+            path=f"azureml://jobs/{job_name}/outputs/outputs/iteration_1_model.pkl",
             name="support-ticket-classifier-rf",
             description="Random Forest baseline model for support ticket priority classification",
             version="${{ github.run_number }}",
@@ -270,13 +268,37 @@ jobs:
                 "commit_sha": "${{ github.sha }}"
             }
         )
-        registered_model1 = ml_client.models.create_or_update(model1)
-        print(f"   ✅ Registered: {registered_model1.name} v{registered_model1.version}")
+
+        try:
+            registered_model1 = ml_client.models.create_or_update(model1)
+            print(f"   ✅ Registered: {registered_model1.name} v{registered_model1.version}")
+        except Exception as e:
+            print(f"   ⚠️  Error registering model 1: {str(e)}")
+            print(f"   Attempting alternative path...")
+            # Try downloading first as fallback
+            ml_client.jobs.download(name=job_name, download_path="./job_outputs", output_name="outputs")
+            model1_alt = Model(
+                path="./job_outputs/named-outputs/outputs/iteration_1_model.pkl",
+                name="support-ticket-classifier-rf",
+                description="Random Forest baseline model for support ticket priority classification",
+                version="${{ github.run_number }}",
+                tags={
+                    "iteration": "1",
+                    "model_type": "RandomForest",
+                    "framework": "scikit-learn",
+                    "n_estimators": "100",
+                    "max_depth": "10",
+                    "github_run": "${{ github.run_number }}",
+                    "commit_sha": "${{ github.sha }}"
+                }
+            )
+            registered_model1 = ml_client.models.create_or_update(model1_alt)
+            print(f"   ✅ Registered (fallback): {registered_model1.name} v{registered_model1.version}")
 
         # Register Iteration 2 Model (Improved - Production Candidate)
         print("\n📝 Registering Iteration 2: XGBoost Improved Model")
         model2 = Model(
-            path="./job_outputs/outputs/iteration_2_model.pkl",
+            path=f"azureml://jobs/{job_name}/outputs/outputs/iteration_2_model.pkl",
             name="support-ticket-classifier",
             description="XGBoost improved model for support ticket priority classification - Production candidate",
             version="${{ github.run_number }}",
@@ -292,8 +314,32 @@ jobs:
                 "production_candidate": "true"
             }
         )
-        registered_model2 = ml_client.models.create_or_update(model2)
-        print(f"   ✅ Registered: {registered_model2.name} v{registered_model2.version}")
+
+        try:
+            registered_model2 = ml_client.models.create_or_update(model2)
+            print(f"   ✅ Registered: {registered_model2.name} v{registered_model2.version}")
+        except Exception as e:
+            print(f"   ⚠️  Error registering model 2: {str(e)}")
+            print(f"   Attempting alternative path...")
+            model2_alt = Model(
+                path="./job_outputs/named-outputs/outputs/iteration_2_model.pkl",
+                name="support-ticket-classifier",
+                description="XGBoost improved model for support ticket priority classification - Production candidate",
+                version="${{ github.run_number }}",
+                tags={
+                    "iteration": "2",
+                    "model_type": "XGBoost",
+                    "framework": "xgboost",
+                    "n_estimators": "200",
+                    "max_depth": "6",
+                    "learning_rate": "0.1",
+                    "github_run": "${{ github.run_number }}",
+                    "commit_sha": "${{ github.sha }}",
+                    "production_candidate": "true"
+                }
+            )
+            registered_model2 = ml_client.models.create_or_update(model2_alt)
+            print(f"   ✅ Registered (fallback): {registered_model2.name} v{registered_model2.version}")
 
         # Save model info for deployment step
         with open("registered_model_name.txt", "w") as f:
