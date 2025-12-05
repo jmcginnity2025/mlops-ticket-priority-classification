@@ -173,10 +173,34 @@ jobs:
         artifacts_path = f"./artifacts/{job_name}/outputs"
         os.makedirs("models", exist_ok=True)
 
+        print(f"\n🔍 Checking for files in: {artifacts_path}")
         if os.path.exists(artifacts_path):
-            for file in os.listdir(artifacts_path):
-                shutil.copy2(os.path.join(artifacts_path, file), f"models/{file}")
-                print(f"✅ Downloaded: {file}")
+            files = os.listdir(artifacts_path)
+            print(f"   Found {len(files)} files")
+            for file in files:
+                src = os.path.join(artifacts_path, file)
+                dst = f"models/{file}"
+                shutil.copy2(src, dst)
+                print(f"   ✅ Copied: {file}")
+        else:
+            print(f"   ❌ Path does not exist!")
+            print(f"   Searching for outputs...")
+            for root, dirs, files in os.walk("."):
+                if "outputs" in root or any(f.endswith(".pkl") for f in files):
+                    print(f"   Found: {root}")
+                    for f in files:
+                        if f.endswith((".pkl", ".json")):
+                            print(f"     - {f}")
+
+        # Verify models were copied
+        model_files = os.listdir("models") if os.path.exists("models") else []
+        print(f"\n📦 Models directory contains {len(model_files)} files:")
+        for f in model_files:
+            print(f"   - {f}")
+
+        if len(model_files) == 0:
+            print("\n❌ ERROR: No model files found!")
+            exit(1)
 
         print("\n✅ Models and metrics downloaded")
         EOF
