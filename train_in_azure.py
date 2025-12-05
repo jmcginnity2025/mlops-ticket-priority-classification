@@ -11,8 +11,6 @@ print("="*70)
 # Step 1: Import libraries
 print("\n1. Importing libraries...")
 from azureml.core import Workspace, Dataset, Run
-import mlflow
-import mlflow.xgboost
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, RandomizedSearchCV
@@ -34,20 +32,14 @@ except:
     ws = Workspace.from_config()
     print(f"✓ Connected to workspace: {ws.name}")
 
-# Step 3: Setup MLflow
-print("\n3. Setting up MLflow...")
-mlflow.set_tracking_uri(ws.get_mlflow_tracking_uri())
-# Don't set experiment - use the one from Azure ML run context
-print("✓ MLflow configured")
-
-# Step 4: Load dataset
-print("\n4. Loading dataset...")
+# Step 3: Load dataset
+print("\n3. Loading dataset...")
 dataset = Dataset.get_by_name(ws, name="support_tickets")
 df = dataset.to_pandas_dataframe()
 print(f"✓ Dataset loaded: {df.shape[0]} rows, {df.shape[1]} columns")
 
-# Step 5: Data Preprocessing
-print("\n5. Preprocessing data...")
+# Step 4: Data Preprocessing
+print("\n4. Preprocessing data...")
 
 # Feature configuration
 numeric_features = [
@@ -114,16 +106,9 @@ X_test = pd.DataFrame(scaler.transform(X_test), columns=feature_cols)
 
 print(f"✓ Preprocessing complete - Train: {X_train.shape}, Test: {X_test.shape}")
 
-# Step 6: Train Iteration 1
-print("\n6. Training Model - Iteration 1...")
+# Step 5: Train Iteration 1
+print("\n5. Training Model - Iteration 1...")
 print("   (RandomizedSearchCV with 5-fold CV - optimized for speed)")
-
-# Log parameters for iteration 1
-mlflow.log_param("iteration", 1)
-mlflow.log_param("model_type", "multiclass_classification")
-mlflow.log_param("algorithm", "xgboost")
-mlflow.log_param("train_samples", len(X_train))
-mlflow.log_param("test_samples", len(X_test))
 
 param_distributions = {
     'max_depth': [4, 5, 6, 7, 8],
@@ -143,10 +128,7 @@ random_search = RandomizedSearchCV(
 random_search.fit(X_train, y_train)
 model_iter1 = random_search.best_estimator_
 
-# Log params
-for param, value in random_search.best_params_.items():
-    mlflow.log_param(f"iter1_{param}", value)
-mlflow.log_metric("iter1_cv_best_score", random_search.best_score_)
+print(f"\n   CV Best Score: {random_search.best_score_:.4f}")
 
 # Evaluate
 y_train_pred = model_iter1.predict(X_train)
@@ -161,17 +143,12 @@ metrics_iter1 = {
     'test_recall': recall_score(y_test, y_test_pred, average='weighted')
 }
 
-for metric_name, metric_value in metrics_iter1.items():
-    mlflow.log_metric(f"iter1_{metric_name}", metric_value)
-
-mlflow.xgboost.log_model(model_iter1, "model_iter1")
-
 print(f"\n   Best params: {random_search.best_params_}")
 print(f"   Test Accuracy: {metrics_iter1['test_accuracy']:.4f}")
 print(f"   Test F1: {metrics_iter1['test_f1']:.4f}")
 
-# Step 7: Train Iteration 2
-print("\n7. Training Model - Iteration 2...")
+# Step 6: Train Iteration 2
+print("\n6. Training Model - Iteration 2...")
 print("   (RandomizedSearchCV with 5-fold CV - optimized for speed)")
 
 param_distributions = {
@@ -193,10 +170,7 @@ random_search = RandomizedSearchCV(
 random_search.fit(X_train, y_train)
 model_iter2 = random_search.best_estimator_
 
-# Log params
-for param, value in random_search.best_params_.items():
-    mlflow.log_param(f"iter2_{param}", value)
-mlflow.log_metric("iter2_cv_best_score", random_search.best_score_)
+print(f"\n   CV Best Score: {random_search.best_score_:.4f}")
 
 # Evaluate
 y_train_pred = model_iter2.predict(X_train)
@@ -211,17 +185,12 @@ metrics_iter2 = {
     'test_recall': recall_score(y_test, y_test_pred, average='weighted')
 }
 
-for metric_name, metric_value in metrics_iter2.items():
-    mlflow.log_metric(f"iter2_{metric_name}", metric_value)
-
-mlflow.xgboost.log_model(model_iter2, "model_iter2")
-
 print(f"\n   Best params: {random_search.best_params_}")
 print(f"   Test Accuracy: {metrics_iter2['test_accuracy']:.4f}")
 print(f"   Test F1: {metrics_iter2['test_f1']:.4f}")
 
-# Step 8: Compare & Test
-print("\n8. Model Comparison & Regression Tests...")
+# Step 7: Compare & Test
+print("\n7. Model Comparison & Regression Tests...")
 
 comparison = pd.DataFrame([
     {'Iteration': 1, **metrics_iter1},
@@ -248,8 +217,8 @@ for i, metrics in [(1, metrics_iter1), (2, metrics_iter2)]:
         print(f"     ✗ F1 Score {metrics['test_f1']:.4f} < {MIN_F1_SCORE}")
         all_passed = False
 
-# Step 9: Register Best Model
-print("\n9. Registering best model...")
+# Step 8: Register Best Model
+print("\n8. Registering best model...")
 
 best_iteration = 1 if metrics_iter1['test_f1'] > metrics_iter2['test_f1'] else 2
 best_model = model_iter1 if best_iteration == 1 else model_iter2

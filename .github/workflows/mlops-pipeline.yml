@@ -180,7 +180,7 @@ jobs:
 
     - name: Install Azure ML SDK
       run: |
-        pip install azureml-core azureml-mlflow
+        pip install azureml-core
 
     - name: Azure Login
       uses: azure/login@v1

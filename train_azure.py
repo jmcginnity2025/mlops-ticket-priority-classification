@@ -1,6 +1,6 @@
 """
 Training Script for Azure ML
-Trains both iterations and logs metrics with MLflow
+Trains both iterations and logs metrics
 """
 import pandas as pd
 import numpy as np
@@ -9,10 +9,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from xgboost import XGBClassifier
-import mlflow
-import mlflow.sklearn
-import mlflow.xgboost
 import argparse
+import joblib
 import os
 
 # Parse arguments
@@ -93,48 +91,48 @@ print("\n" + "="*70)
 print("ITERATION 1: Baseline Random Forest")
 print("="*70)
 
-with mlflow.start_run(run_name="iteration_1_random_forest"):
-    # Log parameters
-    mlflow.log_param("model_type", "RandomForest")
-    mlflow.log_param("n_estimators", 100)
-    mlflow.log_param("max_depth", 10)
-    mlflow.log_param("iteration", 1)
+# Parameters
+params1 = {
+    "model_type": "RandomForest",
+    "n_estimators": 100,
+    "max_depth": 10,
+    "iteration": 1
+}
+print(f"Parameters: {params1}")
 
-    # Train
-    print("Training...")
-    model1 = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=10,
-        random_state=42,
-        n_jobs=-1
-    )
-    model1.fit(X_train, y_train)
+# Train
+print("Training...")
+model1 = RandomForestClassifier(
+    n_estimators=100,
+    max_depth=10,
+    random_state=42,
+    n_jobs=-1
+)
+model1.fit(X_train, y_train)
 
-    # Evaluate
-    y_train_pred = model1.predict(X_train)
-    y_test_pred = model1.predict(X_test)
+# Evaluate
+y_train_pred = model1.predict(X_train)
+y_test_pred = model1.predict(X_test)
 
-    train_acc = accuracy_score(y_train, y_train_pred)
-    test_acc = accuracy_score(y_test, y_test_pred)
-    train_f1 = f1_score(y_train, y_train_pred, average='weighted')
-    test_f1 = f1_score(y_test, y_test_pred, average='weighted')
-    test_precision = precision_score(y_test, y_test_pred, average='weighted')
-    test_recall = recall_score(y_test, y_test_pred, average='weighted')
+train_acc = accuracy_score(y_train, y_train_pred)
+test_acc = accuracy_score(y_test, y_test_pred)
+train_f1 = f1_score(y_train, y_train_pred, average='weighted')
+test_f1 = f1_score(y_test, y_test_pred, average='weighted')
+test_precision = precision_score(y_test, y_test_pred, average='weighted')
+test_recall = recall_score(y_test, y_test_pred, average='weighted')
 
-    # Log metrics
-    mlflow.log_metric("train_accuracy", train_acc)
-    mlflow.log_metric("test_accuracy", test_acc)
-    mlflow.log_metric("train_f1", train_f1)
-    mlflow.log_metric("test_f1", test_f1)
-    mlflow.log_metric("test_precision", test_precision)
-    mlflow.log_metric("test_recall", test_recall)
+# Print metrics
+print(f"   Train Accuracy: {train_acc:.4f}")
+print(f"   Test Accuracy:  {test_acc:.4f}")
+print(f"   Train F1:       {train_f1:.4f}")
+print(f"   Test F1:        {test_f1:.4f}")
+print(f"   Test Precision: {test_precision:.4f}")
+print(f"   Test Recall:    {test_recall:.4f}")
 
-    # Log model
-    mlflow.sklearn.log_model(model1, "model")
-
-    print(f"   Train Accuracy: {train_acc:.4f}")
-    print(f"   Test Accuracy:  {test_acc:.4f}")
-    print(f"   Test F1 Score:  {test_f1:.4f}")
+# Save model
+os.makedirs("outputs", exist_ok=True)
+joblib.dump(model1, "outputs/model_iteration1.pkl")
+print("   Model saved to outputs/model_iteration1.pkl")
 
 # ============================================================================
 # ITERATION 2: XGBoost (Improved)
@@ -143,56 +141,55 @@ print("\n" + "="*70)
 print("ITERATION 2: Improved XGBoost")
 print("="*70)
 
-with mlflow.start_run(run_name="iteration_2_xgboost"):
-    # Log parameters
-    mlflow.log_param("model_type", "XGBoost")
-    mlflow.log_param("n_estimators", 200)
-    mlflow.log_param("max_depth", 6)
-    mlflow.log_param("learning_rate", 0.1)
-    mlflow.log_param("iteration", 2)
+# Parameters
+params2 = {
+    "model_type": "XGBoost",
+    "n_estimators": 200,
+    "max_depth": 6,
+    "learning_rate": 0.1,
+    "iteration": 2
+}
+print(f"Parameters: {params2}")
 
-    # Train
-    print("Training...")
-    model2 = XGBClassifier(
-        n_estimators=200,
-        max_depth=6,
-        learning_rate=0.1,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        eval_metric='mlogloss',
-        use_label_encoder=False
-    )
-    model2.fit(X_train, y_train)
+# Train
+print("Training...")
+model2 = XGBClassifier(
+    n_estimators=200,
+    max_depth=6,
+    learning_rate=0.1,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    random_state=42,
+    eval_metric='mlogloss',
+    use_label_encoder=False
+)
+model2.fit(X_train, y_train)
 
-    # Evaluate
-    y_train_pred = model2.predict(X_train)
-    y_test_pred = model2.predict(X_test)
+# Evaluate
+y_train_pred = model2.predict(X_train)
+y_test_pred = model2.predict(X_test)
 
-    train_acc = accuracy_score(y_train, y_train_pred)
-    test_acc = accuracy_score(y_test, y_test_pred)
-    train_f1 = f1_score(y_train, y_train_pred, average='weighted')
-    test_f1 = f1_score(y_test, y_test_pred, average='weighted')
-    test_precision = precision_score(y_test, y_test_pred, average='weighted')
-    test_recall = recall_score(y_test, y_test_pred, average='weighted')
+train_acc = accuracy_score(y_train, y_train_pred)
+test_acc = accuracy_score(y_test, y_test_pred)
+train_f1 = f1_score(y_train, y_train_pred, average='weighted')
+test_f1 = f1_score(y_test, y_test_pred, average='weighted')
+test_precision = precision_score(y_test, y_test_pred, average='weighted')
+test_recall = recall_score(y_test, y_test_pred, average='weighted')
 
-    # Log metrics
-    mlflow.log_metric("train_accuracy", train_acc)
-    mlflow.log_metric("test_accuracy", test_acc)
-    mlflow.log_metric("train_f1", train_f1)
-    mlflow.log_metric("test_f1", test_f1)
-    mlflow.log_metric("test_precision", test_precision)
-    mlflow.log_metric("test_recall", test_recall)
+# Print metrics
+print(f"   Train Accuracy: {train_acc:.4f}")
+print(f"   Test Accuracy:  {test_acc:.4f}")
+print(f"   Train F1:       {train_f1:.4f}")
+print(f"   Test F1:        {test_f1:.4f}")
+print(f"   Test Precision: {test_precision:.4f}")
+print(f"   Test Recall:    {test_recall:.4f}")
 
-    # Log model
-    mlflow.xgboost.log_model(model2, "model")
-
-    print(f"   Train Accuracy: {train_acc:.4f}")
-    print(f"   Test Accuracy:  {test_acc:.4f}")
-    print(f"   Test F1 Score:  {test_f1:.4f}")
+# Save model
+joblib.dump(model2, "outputs/model_iteration2.pkl")
+print("   Model saved to outputs/model_iteration2.pkl")
 
 print("\n" + "="*70)
 print("TRAINING COMPLETE")
 print("="*70)
 print("\nBoth iterations trained successfully!")
-print("Metrics logged to MLflow")
+print("Models saved to outputs/ directory")
