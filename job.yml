@@ -1,0 +1,7 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+command: python train_in_azure.py
+code: .
+environment: azureml:AzureML-sklearn-1.0-ubuntu20.04-py38-cpu@latest
+compute: azureml:MLOps-compute-instance
+experiment_name: ticket-priority-classification-manual
+display_name: manual-training-run

@@ -1,0 +1,22 @@
+{
+  "timestamp": "2025-12-04T16:43:55.535167",
+  "baseline": {
+    "iteration": 1,
+    "model_type": "RandomForest",
+    "test_accuracy": 0.8684479934479934,
+    "test_f1": 0.8660027009645986
+  },
+  "current": {
+    "iteration": 2,
+    "model_type": "XGBoost",
+    "test_accuracy": 0.9097051597051597,
+    "test_f1": 0.9088314674243624
+  },
+  "differences": {
+    "accuracy": 0.041257166257166356,
+    "f1_score": 0.042828766459763745
+  },
+  "regression_threshold": -0.02,
+  "passed": true,
+  "failure_reasons": []
+}
