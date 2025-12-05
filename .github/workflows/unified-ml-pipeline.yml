@@ -451,8 +451,30 @@ jobs:
         # Deploy directly from local model files (no Model Registry)
         # Copy model file to deployment directory
         import shutil
+
+        # Debug: List what files we have
+        print("\n🔍 Checking for model files...")
+        print(f"Current directory: {os.getcwd()}")
+        if os.path.exists("./models"):
+            print("Contents of ./models:")
+            for root, dirs, files in os.walk("./models"):
+                for file in files:
+                    print(f"  {os.path.join(root, file)}")
+        else:
+            print("⚠️  ./models directory does not exist!")
+
         os.makedirs("deployment", exist_ok=True)
-        shutil.copy("./models/iteration_2/iteration_2_model.pkl", "./deployment/iteration_2_model.pkl")
+
+        # Check if iteration_2 model exists, otherwise use iteration_1
+        if os.path.exists("./models/iteration_2/iteration_2_model.pkl"):
+            print("✅ Using iteration_2_model.pkl")
+            shutil.copy("./models/iteration_2/iteration_2_model.pkl", "./deployment/iteration_2_model.pkl")
+        elif os.path.exists("./models/iteration_1/iteration_1_model.pkl"):
+            print("⚠️  iteration_2 not found, using iteration_1_model.pkl as fallback")
+            shutil.copy("./models/iteration_1/iteration_1_model.pkl", "./deployment/iteration_2_model.pkl")
+        else:
+            raise FileNotFoundError("No model files found in ./models/iteration_1 or ./models/iteration_2")
+
         shutil.copy("score.py", "./deployment/score.py")
 
         print("\n📦 Preparing deployment package (without Model Registry)...")
