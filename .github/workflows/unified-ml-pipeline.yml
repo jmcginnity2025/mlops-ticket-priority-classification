@@ -75,7 +75,7 @@ jobs:
       id: submit_job
       run: |
         python << 'EOF'
-        from azure.ai.ml import MLClient, command, Input
+        from azure.ai.ml import MLClient, command, Input, Output
         from azure.ai.ml.entities import Environment
         from azure.identity import DefaultAzureCredential
         import os
@@ -118,6 +118,9 @@ jobs:
                     type="uri_file",
                     path=data_asset.id
                 )
+            },
+            outputs={
+                "outputs": Output(type="uri_folder")
             },
             environment=env,
             compute="${{ env.COMPUTE_NAME }}",
