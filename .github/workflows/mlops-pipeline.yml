@@ -1,5 +1,5 @@
 # GitHub Actions CI/CD Pipeline for MLOps
-name: Ticket Classification CICD Final
+name: final CICD Pipeline - ticket classification
 
 on:
   push:
