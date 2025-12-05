@@ -94,7 +94,7 @@ jobs:
 
     - name: Install Azure ML SDK
       run: |
-        pip install azureml-core azureml-mlflow
+        pip install azure-ai-ml azure-identity
 
     - name: Azure Login
       uses: azure/login@v1
@@ -102,66 +102,57 @@ jobs:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
     - name: Submit training job to Azure ML
+      id: submit_job
       run: |
         python -c "
-        from azureml.core import Workspace, Experiment, ScriptRunConfig, Environment
-        from azureml.core.compute import ComputeTarget
-        import time
+        from azure.ai.ml import MLClient, command, Input
+        from azure.ai.ml.entities import Environment
+        from azure.identity import DefaultAzureCredential
 
         # Connect to workspace
-        ws = Workspace(
+        ml_client = MLClient(
+            DefaultAzureCredential(),
             subscription_id='${{ secrets.AZURE_SUBSCRIPTION_ID }}',
-            resource_group='${{ secrets.AZURE_RESOURCE_GROUP }}',
+            resource_group_name='${{ secrets.AZURE_RESOURCE_GROUP }}',
             workspace_name='${{ secrets.AZURE_WORKSPACE_NAME }}'
         )
-        print(f'✅ Connected to workspace: {ws.name}')
+        print(f'✅ Connected to workspace: {ml_client.workspace_name}')
 
-        # Get compute target
-        compute_target = ComputeTarget(workspace=ws, name='CPU-Cluster')
-        print(f'✅ Using compute: {compute_target.name}')
+        # Get dataset (ensure it exists in your workspace)
+        data_asset = ml_client.data.get(name='support-tickets-dataset', version='1')
+        print(f'✅ Using dataset: {data_asset.name} v{data_asset.version}')
 
-        # Create environment from requirements.txt
-        env = Environment.from_pip_requirements(name='mlops-env', file_path='requirements.txt')
-        env.python.conda_dependencies.set_python_version('3.9')
+        # Create environment from conda file
+        env = Environment(
+            name='mlops-training-env',
+            conda_file='environment.yml',
+            image='mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04:latest'
+        )
+        print('✅ Environment configured')
 
-        # Register environment (image will build automatically when job runs)
-        print('🔧 Registering environment...')
-        env.register(workspace=ws)
-        print('✅ Environment registered - image will build when training job starts')
-
-        # Configure the training run
-        config = ScriptRunConfig(
-            source_directory='.',
-            script='train_in_azure.py',
-            compute_target=compute_target,
-            environment=env
+        # Create the command job
+        job = command(
+            code='./',
+            command='python train_azure.py --data_path ${{inputs.dataset}}',
+            inputs={'dataset': Input(type='uri_file', path=data_asset.id)},
+            environment=env,
+            compute='CPU-Cluster',
+            experiment_name='ticket-priority-classification-cicd',
+            display_name=f'github-actions-run-${{ github.run_number }}'
         )
 
-        # Submit experiment
-        experiment = Experiment(workspace=ws, name='ticket-priority-classification-cicd')
-        run = experiment.submit(config)
+        # Submit the job
+        returned_job = ml_client.jobs.create_or_update(job)
+        print(f'✅ Submitted job: {returned_job.name}')
+        print(f'📊 Monitor at: {returned_job.studio_url}')
 
-        print(f'✅ Submitted run: {run.id}')
-        print(f'📊 Monitor at: {run.get_portal_url()}')
+        # Stream the job logs
+        ml_client.jobs.stream(returned_job.name)
 
-        # Wait for completion (with timeout)
-        print('⏳ Waiting for training to complete...')
-        print('   Max wait time: 30 minutes')
-
-        try:
-            run.wait_for_completion(show_output=True, wait_post_processing=True)
-
-            status = run.get_status()
-            if status == 'Completed':
-                print('✅ Training completed successfully!')
-                exit(0)
-            else:
-                print(f'❌ Training failed with status: {status}')
-                exit(1)
-        except Exception as e:
-            print(f'❌ Error during training: {str(e)}')
-            print(f'   Job status: {run.get_status()}')
-            print(f'   Portal URL: {run.get_portal_url()}')
+        # Check final status
+        final_status = ml_client.jobs.get(returned_job.name).status
+        if final_status != 'Completed':
+            print(f'❌ Training job failed with status: {final_status}')
             exit(1)
         "
 
