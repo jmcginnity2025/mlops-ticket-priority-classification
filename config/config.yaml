@@ -1,0 +1,197 @@
+# Azure ML Configuration
+azure:
+  subscription_id: "d5156f99-abd5-4af9-9e2d-a875ef22df46"  # Azure for Students
+  resource_group: "mlops-cw2-rg"
+  workspace_name: "ticket-priority-workspace"
+  compute_name: "cpu-cluster"
+
+  # Storage
+  datastore_name: "workspaceblobstore"
+  dataset_name: "support_tickets"
+  dataset_version: "1"
+
+# Data Configuration
+data:
+  raw_data_path: "C:\\AI Masters\\AI Masters\\Infrastucture Module - Azure\\CW2\\cleaned_support_tickets - with context.csv"
+  processed_data_path: "data/processed/"
+  train_test_split: 0.2  # 80% train, 20% test
+  random_seed: 42
+
+  # Target variables
+  target_multiclass: "priority_cat"  # For classification (1=Low, 2=Medium, 3=High)
+  target_score: "priority_score_internal"  # For ranking
+
+  # Feature groups
+  numeric_features:
+    - "org_users"
+    - "past_30d_tickets"
+    - "customers_affected"
+    - "error_rate_pct"
+    - "downtime_min"
+    - "description_length"
+    - "resolution_time_hours"
+    - "customer_satisfaction_score"
+    - "revenue_dollars"
+    - "api_calls_per_day"
+    - "team_size"
+    - "satisfaction_score_0_10"
+
+  categorical_features:
+    - "day_of_week_num"
+    - "company_size_cat"
+    - "industry_cat"
+    - "customer_tier_cat"
+    - "region_cat"
+    - "product_area_cat"
+    - "booking_channel_cat"
+    - "reported_by_role_cat"
+    - "customer_sentiment_cat"
+
+  binary_features:
+    - "payment_impact_flag"
+    - "data_loss_flag"
+    - "has_runbook"
+
+# Model Configuration
+models:
+  multiclass:
+    name: "priority_classifier"
+    algorithm: "xgboost"
+    hyperparameters:
+      max_depth: [3, 5, 7]
+      n_estimators: [100, 200]
+      learning_rate: [0.01, 0.1]
+
+  ranking:
+    name: "priority_ranker"
+    algorithm: "xgboost_regressor"
+    hyperparameters:
+      max_depth: [3, 5]
+      n_estimators: [100, 200]
+      learning_rate: [0.01, 0.1]
+
+# Training Configuration
+training:
+  cross_validation_folds: 5
+  early_stopping_rounds: 10
+  metric_multiclass: "f1_weighted"
+  metric_ranking: "rmse"
+  handle_imbalance: true
+  use_class_weights: true
+
+# Evaluation Configuration
+evaluation:
+  metrics_multiclass:
+    - "accuracy"
+    - "f1_weighted"
+    - "precision_weighted"
+    - "recall_weighted"
+    - "confusion_matrix"
+
+  metrics_ranking:
+    - "rmse"
+    - "mae"
+    - "r2_score"
+    - "spearman_correlation"
+
+  # Performance thresholds for regression tests
+  min_accuracy: 0.75
+  min_f1_score: 0.70
+  max_rmse: 30.0
+
+# MLflow Configuration
+mlflow:
+  tracking_uri: "file:./mlruns"  # Local tracking
+  experiment_name: "ticket-priority-classification"
+  artifact_location: "artifacts"
+  log_models: true
+  log_artifacts: true
+
+# Deployment Configuration
+deployment:
+  endpoint_name: "ticket-priority-endpoint"
+  deployment_name: "ticket-priority-v1"
+  instance_type: "Standard_DS2_v2"
+  instance_count: 1
+  auth_mode: "key"
+
+# Monitoring Configuration
+monitoring:
+  data_drift:
+    enabled: true
+    baseline_dataset: "training_data"
+    drift_threshold: 0.15
+    check_frequency_hours: 24
+    features_to_monitor: "all"  # or specify list of features
+
+  model_performance:
+    enabled: true
+    accuracy_threshold: 0.75
+    f1_threshold: 0.70
+    alert_on_degradation: true
+
+  logging:
+    level: "INFO"
+    retention_days: 30
+    log_predictions: true
+    sample_rate: 0.1  # Log 10% of predictions
+
+# Retraining Configuration
+retraining:
+  enabled: true
+  trigger_conditions:
+    data_drift_threshold: 0.15
+    performance_degradation_threshold: 0.05  # 5% drop in F1
+    min_new_samples: 1000
+    schedule: "weekly"  # or "daily", "monthly"
+
+  validation_strategy: "hold_out"
+  approval_required: true
+
+# Data Versioning (DVC/Azure ML Datasets)
+versioning:
+  enabled: true
+  tool: "azure_ml_datasets"  # or "dvc"
+  track_metrics: true
+  track_parameters: true
+  track_artifacts: true
+
+# CI/CD Configuration
+cicd:
+  enabled: true
+  platform: "azure_devops"  # or "github_actions"
+
+  tests:
+    unit_tests: true
+    integration_tests: true
+    data_validation: true
+    model_validation: true
+
+  deployment_strategy: "blue_green"  # or "canary", "rolling"
+
+  stages:
+    - name: "build"
+      run_tests: true
+    - name: "staging"
+      auto_deploy: true
+      approval_required: false
+    - name: "production"
+      auto_deploy: false
+      approval_required: true
+
+# Governance Configuration
+governance:
+  model_registry:
+    enabled: true
+    require_approval: true
+    track_lineage: true
+
+  compliance:
+    log_data_access: true
+    audit_trail: true
+    data_retention_policy_days: 365
+
+  explainability:
+    enabled: true
+    method: "shap"  # or "lime"
+    generate_reports: true

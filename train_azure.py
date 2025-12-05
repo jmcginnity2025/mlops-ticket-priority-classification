@@ -1,6 +1,6 @@
 """
 Training Script for Azure ML
-Trains both iterations and logs metrics to Azure ML Studio
+Trains both iterations and logs metrics
 """
 import pandas as pd
 import numpy as np
@@ -10,35 +10,20 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from xgboost import XGBClassifier
 import argparse
+import joblib
 import os
-import pickle
-import json
-
-# Import Azure ML native logging
-try:
-    from azureml.core import Run
-    run = Run.get_context()
-    AZURE_ML_LOGGING = True
-    print("INFO: Azure ML native logging enabled")
-except:
-    AZURE_ML_LOGGING = False
-    print("INFO: Running locally - Azure ML logging not available")
 
 # Parse arguments
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_path', type=str, required=True, help='Path to dataset')
+parser.add_argument('--data_path', type=str, help='Path to dataset')
 args = parser.parse_args()
 
 print("="*70)
 print("AZURE ML TRAINING - Support Ticket Priority Classification")
 print("="*70)
 
-# Verify data path received
+# Load data
 print(f"\n1. Loading dataset from: {args.data_path}")
-if not os.path.exists(args.data_path):
-    print(f"ERROR: Dataset file not found at: {args.data_path}")
-    exit(1)
-
 df = pd.read_csv(args.data_path)
 print(f"   Loaded {df.shape[0]} rows, {df.shape[1]} columns")
 
@@ -106,6 +91,15 @@ print("\n" + "="*70)
 print("ITERATION 1: Baseline Random Forest")
 print("="*70)
 
+# Parameters
+params1 = {
+    "model_type": "RandomForest",
+    "n_estimators": 100,
+    "max_depth": 10,
+    "iteration": 1
+}
+print(f"Parameters: {params1}")
+
 # Train
 print("Training...")
 model1 = RandomForestClassifier(
@@ -127,42 +121,18 @@ test_f1 = f1_score(y_test, y_test_pred, average='weighted')
 test_precision = precision_score(y_test, y_test_pred, average='weighted')
 test_recall = recall_score(y_test, y_test_pred, average='weighted')
 
-# Save metrics and model to files
-os.makedirs("outputs", exist_ok=True)
-
-# Save iteration 1 metrics
-metrics_1 = {
-    "iteration": 1,
-    "model_type": "RandomForest",
-    "train_accuracy": float(train_acc),
-    "test_accuracy": float(test_acc),
-    "train_f1": float(train_f1),
-    "test_f1": float(test_f1),
-    "test_precision": float(test_precision),
-    "test_recall": float(test_recall)
-}
-with open("outputs/iteration_1_metrics.json", "w") as f:
-    json.dump(metrics_1, f, indent=2)
-print("   Metrics saved to outputs/iteration_1_metrics.json")
-
-# Log to Azure ML Studio (will appear in Metrics tab)
-if AZURE_ML_LOGGING:
-    run.log("iteration_1_train_accuracy", float(train_acc))
-    run.log("iteration_1_test_accuracy", float(test_acc))
-    run.log("iteration_1_train_f1", float(train_f1))
-    run.log("iteration_1_test_f1", float(test_f1))
-    run.log("iteration_1_test_precision", float(test_precision))
-    run.log("iteration_1_test_recall", float(test_recall))
-    print("   Metrics logged to Azure ML Studio")
-
-# Save iteration 1 model
-with open("outputs/iteration_1_model.pkl", "wb") as f:
-    pickle.dump(model1, f)
-print("   Model saved to outputs/iteration_1_model.pkl")
-
+# Print metrics
 print(f"   Train Accuracy: {train_acc:.4f}")
 print(f"   Test Accuracy:  {test_acc:.4f}")
-print(f"   Test F1 Score:  {test_f1:.4f}")
+print(f"   Train F1:       {train_f1:.4f}")
+print(f"   Test F1:        {test_f1:.4f}")
+print(f"   Test Precision: {test_precision:.4f}")
+print(f"   Test Recall:    {test_recall:.4f}")
+
+# Save model
+os.makedirs("outputs", exist_ok=True)
+joblib.dump(model1, "outputs/model_iteration1.pkl")
+print("   Model saved to outputs/model_iteration1.pkl")
 
 # ============================================================================
 # ITERATION 2: XGBoost (Improved)
@@ -170,6 +140,16 @@ print(f"   Test F1 Score:  {test_f1:.4f}")
 print("\n" + "="*70)
 print("ITERATION 2: Improved XGBoost")
 print("="*70)
+
+# Parameters
+params2 = {
+    "model_type": "XGBoost",
+    "n_estimators": 200,
+    "max_depth": 6,
+    "learning_rate": 0.1,
+    "iteration": 2
+}
+print(f"Parameters: {params2}")
 
 # Train
 print("Training...")
@@ -196,50 +176,20 @@ test_f1 = f1_score(y_test, y_test_pred, average='weighted')
 test_precision = precision_score(y_test, y_test_pred, average='weighted')
 test_recall = recall_score(y_test, y_test_pred, average='weighted')
 
-# Save iteration 2 metrics
-metrics_2 = {
-    "iteration": 2,
-    "model_type": "XGBoost",
-    "train_accuracy": float(train_acc),
-    "test_accuracy": float(test_acc),
-    "train_f1": float(train_f1),
-    "test_f1": float(test_f1),
-    "test_precision": float(test_precision),
-    "test_recall": float(test_recall)
-}
-with open("outputs/iteration_2_metrics.json", "w") as f:
-    json.dump(metrics_2, f, indent=2)
-print("   Metrics saved to outputs/iteration_2_metrics.json")
-
-# Log to Azure ML Studio (will appear in Metrics tab)
-if AZURE_ML_LOGGING:
-    run.log("iteration_2_train_accuracy", float(train_acc))
-    run.log("iteration_2_test_accuracy", float(test_acc))
-    run.log("iteration_2_train_f1", float(train_f1))
-    run.log("iteration_2_test_f1", float(test_f1))
-    run.log("iteration_2_test_precision", float(test_precision))
-    run.log("iteration_2_test_recall", float(test_recall))
-
-    # Log comparison metrics
-    improvement = (metrics_2['test_accuracy'] - metrics_1['test_accuracy']) * 100
-    run.log("accuracy_improvement_percent", float(improvement))
-    print("   Metrics logged to Azure ML Studio")
-
-# Save iteration 2 model
-with open("outputs/iteration_2_model.pkl", "wb") as f:
-    pickle.dump(model2, f)
-print("   Model saved to outputs/iteration_2_model.pkl")
-
+# Print metrics
 print(f"   Train Accuracy: {train_acc:.4f}")
 print(f"   Test Accuracy:  {test_acc:.4f}")
-print(f"   Test F1 Score:  {test_f1:.4f}")
+print(f"   Train F1:       {train_f1:.4f}")
+print(f"   Test F1:        {test_f1:.4f}")
+print(f"   Test Precision: {test_precision:.4f}")
+print(f"   Test Recall:    {test_recall:.4f}")
+
+# Save model
+joblib.dump(model2, "outputs/model_iteration2.pkl")
+print("   Model saved to outputs/model_iteration2.pkl")
 
 print("\n" + "="*70)
 print("TRAINING COMPLETE")
 print("="*70)
 print("\nBoth iterations trained successfully!")
-print("Models and metrics saved to outputs/ directory")
-print("\nSummary:")
-print(f"  Iteration 1 (Random Forest): {metrics_1['test_accuracy']:.4f} accuracy")
-print(f"  Iteration 2 (XGBoost):       {metrics_2['test_accuracy']:.4f} accuracy")
-print(f"  Improvement: {(metrics_2['test_accuracy'] - metrics_1['test_accuracy'])*100:.2f}%")
+print("Models saved to outputs/ directory")

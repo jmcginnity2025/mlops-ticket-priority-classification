@@ -44,9 +44,9 @@ mlruns/
 mlartifacts/
 
 # Data files
-# *.csv  # Commented out to allow dataset
+*.csv
 *.parquet
-# *.json  # Commented out to allow config files
+*.json
 !config/*.yaml
 !config/*.json
 
@@ -97,4 +97,3 @@ junit/
 *.bak
 *.swp
 nul
-CREDENTIALS_LOCAL_ONLY.txt
