@@ -451,6 +451,13 @@ jobs:
         # Deploy directly from local model files (no Model Registry)
         # Copy model file to deployment directory
         import shutil
+
+        # Debug: List available files
+        print("\n🔍 Checking models directory:")
+        for root, dirs, files in os.walk("./models"):
+            for f in files:
+                print(f"  Found: {os.path.join(root, f)}")
+
         os.makedirs("deployment", exist_ok=True)
         shutil.copy("./models/iteration_2/iteration_2_model.pkl", "./deployment/iteration_2_model.pkl")
         shutil.copy("score.py", "./deployment/score.py")
