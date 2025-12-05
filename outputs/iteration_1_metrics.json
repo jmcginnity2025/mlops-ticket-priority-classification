@@ -1,0 +1,10 @@
+{
+  "iteration": 1,
+  "model_type": "RandomForest",
+  "train_accuracy": 0.8968491642990606,
+  "test_accuracy": 0.8684479934479934,
+  "train_f1": 0.8954145370431952,
+  "test_f1": 0.8660027009645986,
+  "test_precision": 0.8706994285602369,
+  "test_recall": 0.8684479934479934
+}

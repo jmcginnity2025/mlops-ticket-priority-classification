@@ -1,0 +1,10 @@
+{
+  "iteration": 2,
+  "model_type": "XGBoost",
+  "train_accuracy": 0.9546187514397604,
+  "test_accuracy": 0.9097051597051597,
+  "train_f1": 0.9542356367625833,
+  "test_f1": 0.9088314674243624,
+  "test_precision": 0.9090156780905091,
+  "test_recall": 0.9097051597051597
+}
