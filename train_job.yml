@@ -1,0 +1,8 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+command: python train_azure_ml.py
+code: .
+environment: azureml:AzureML-sklearn-1.0-ubuntu20.04-py38-cpu@latest
+compute: azureml:MLOps-compute-instance
+experiment_name: ticket-priority-classification-rf-xgboost
+display_name: rf-xgboost-training-run
+description: Train Random Forest and XGBoost models on support ticket priority classification dataset (48,388 records)

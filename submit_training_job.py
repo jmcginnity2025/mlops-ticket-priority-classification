@@ -1,75 +1,82 @@
 """
-Submit Training Job to Azure ML
+Submit Azure ML Training Job for Random Forest and XGBoost Models
+
+This script submits a training job to Azure ML that will:
+1. Train both Random Forest and XGBoost classifiers
+2. Use the actual dataset: cleaned_support_tickets - with context.csv (48,388 records)
+3. Log comprehensive metrics to Azure ML Studio
+4. Save trained models as artifacts
+
+Usage:
+    python submit_training_job.py
 """
-from azure.ai.ml import MLClient, command, Input
-from azure.ai.ml.entities import Environment
+
+from azure.ai.ml import MLClient
+from azure.ai.ml import command, Input
 from azure.identity import DefaultAzureCredential
-import json
+from azure.ai.ml.entities import Environment
+import os
 
-# Load config
-with open("azure_config.json", 'r') as f:
-    config = json.load(f)
+# Initialize Azure ML client
+print("🔐 Authenticating with Azure...")
+credential = DefaultAzureCredential()
 
-print("="*70)
-print("SUBMITTING TRAINING JOB TO AZURE ML")
-print("="*70)
-
-# Connect to Azure ML
-print("\nConnecting to Azure ML...")
 ml_client = MLClient(
-    DefaultAzureCredential(),
-    subscription_id=config['subscription_id'],
-    resource_group_name=config['resource_group'],
-    workspace_name=config['workspace_name']
-)
-print(f"Connected to: {config['workspace_name']}")
-
-# Get dataset
-print("\nGetting dataset...")
-data_asset = ml_client.data.get(name="support-tickets-dataset", version="1")
-print(f"Dataset: {data_asset.name} v{data_asset.version}")
-
-# Create environment
-print("\nCreating environment...")
-env = Environment(
-    name="mlops-training-env",
-    description="Environment for ML training",
-    conda_file="environment.yml",
-    image="mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04:latest"
+    credential=credential,
+    subscription_id=os.getenv("AZURE_SUBSCRIPTION_ID"),
+    resource_group_name=os.getenv("AZURE_RESOURCE_GROUP", "mlops-cw2-rg"),
+    workspace_name=os.getenv("AZURE_WORKSPACE_NAME", "ticket-priority-workspace")
 )
 
-# Create job
-print("\nConfiguring training job...")
-job = command(
-    code="./",
-    command="python train_azure.py --data_path ${{inputs.dataset}}",
-    inputs={
-        "dataset": Input(
-            type="uri_file",
-            path=data_asset.id
-        )
-    },
-    environment=env,
-    compute=config['compute_name'],
-    experiment_name="cw2-ticket-priority-classification",
-    display_name="train-both-iterations"
+print(f"✅ Connected to Azure ML workspace: {ml_client.workspace_name}")
+
+# Submit job using job.yml configuration
+print("\n📤 Submitting training job to Azure ML...")
+print("   - Script: train_azure_ml.py")
+print("   - Models: Random Forest + XGBoost")
+print("   - Dataset: cleaned_support_tickets - with context.csv (48,388 records)")
+print("   - Compute: MLOps-compute-instance")
+print("   - Experiment: ticket-priority-classification-rf-xgboost")
+
+# Load and submit the job
+job = ml_client.jobs.create_or_update(
+    ml_client.jobs.load("train_job.yml")
 )
 
-# Submit job
-print("\nSubmitting job...")
-print(f"Compute: {config['compute_name']}")
-print(f"Experiment: cw2-ticket-priority-classification")
+print(f"\n✅ Job submitted successfully!")
+print(f"   - Job Name: {job.name}")
+print(f"   - Status: {job.status}")
+print(f"   - Studio URL: {job.studio_url}")
 
-returned_job = ml_client.jobs.create_or_update(job)
+print("\n🔍 To view job progress:")
+print(f"   1. Open Azure ML Studio: {job.studio_url}")
+print(f"   2. Navigate to: Experiments → ticket-priority-classification-rf-xgboost")
+print(f"   3. Click on run: {job.name}")
+print(f"   4. View metrics in 'Metrics' tab")
+print(f"   5. Download models from 'Outputs + logs' tab")
 
-print(f"\nJob submitted successfully!")
-print(f"Job name: {returned_job.name}")
-print(f"Job status: {returned_job.status}")
-print(f"\nMonitor job in Azure ML Studio:")
-print(f"https://ml.azure.com/runs/{returned_job.name}")
-print(f"?wsid=/subscriptions/{config['subscription_id']}/resourceGroups/{config['resource_group']}/providers/Microsoft.MachineLearningServices/workspaces/{config['workspace_name']}")
+print("\n⏳ Streaming job logs (this may take 10-15 minutes)...")
+print("=" * 80)
 
-print("\n" + "="*70)
-print("To check job status, run:")
-print(f"  az ml job show --name {returned_job.name} --resource-group {config['resource_group']} --workspace-name {config['workspace_name']}")
-print("="*70)
+# Stream the job logs
+ml_client.jobs.stream(job.name)
+
+print("\n" + "=" * 80)
+print("✅ TRAINING JOB COMPLETED")
+print("=" * 80)
+
+# Get final job status
+final_job = ml_client.jobs.get(job.name)
+print(f"\n📊 Final Status: {final_job.status}")
+
+if final_job.status == "Completed":
+    print("\n✅ SUCCESS! Both models trained successfully.")
+    print("\n📈 Next steps:")
+    print("   1. Review metrics in Azure ML Studio")
+    print("   2. Compare Random Forest vs XGBoost performance")
+    print("   3. Download trained models from artifacts")
+    print("   4. Proceed with regression testing (2% threshold)")
+    print("\n🔗 View results: " + final_job.studio_url)
+else:
+    print(f"\n❌ Job failed with status: {final_job.status}")
+    print(f"   Check logs at: {final_job.studio_url}")
